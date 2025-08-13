@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Banco de Emojis — Copiar com 1 clique</title>
+  <meta name="description" content="Lista de emojis para copiar com um clique. Pesquise por nome, tag ou emoji e copie direto.">
+  <meta name="color-scheme" content="dark light">
+  <style>
+    :root{
+      --bg: #0e1014; --panel:#151922; --muted:#8a93a3; --text:#e8ecf3; --brand:#7c5cff; --ok:#22c55e;
+      --border:#232834; --hover:#1b2030; --focus:#3b82f6;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial;
+      background: var(--bg); color: var(--text); line-height:1.5;
+    }
+    .wrap{max-width:1100px; margin:0 auto; padding:24px}
+    header{display:flex; gap:16px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-bottom:16px}
+    h1{font-size: clamp(20px, 3vw, 28px); margin:0}
+    .search{flex:1; min-width:240px; display:flex; gap:8px}
+    .search input{
+      flex:1; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:var(--panel); color:var(--text);
+      outline:none;
+    }
+    .search input:focus{border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 30%, transparent)}
+    .pill{
+      padding:8px 12px; border-radius:999px; background:var(--panel); border:1px solid var(--border); color:var(--muted); font-size:12px
+    }
+    .table{
+      width:100%; border-collapse:separate; border-spacing:0; overflow:hidden; border:1px solid var(--border); border-radius:14px; background: var(--panel)
+    }
+    .table thead th{
+      text-align:left; padding:12px; font-size:13px; color:var(--muted); background:linear-gradient(to bottom, #172033, #141a26);
+      position:sticky; top:0; z-index:1; border-bottom:1px solid var(--border);
+    }
+    .table tbody td{padding:14px 12px; border-bottom:1px solid var(--border); vertical-align:middle}
+    .emoji{
+      font-size:28px; display:inline-flex; width:40px; height:40px; align-items:center; justify-content:center; border-radius:10px; background: var(--hover);
+      border:1px solid var(--border)
+    }
+    .name{font-weight:600}
+    .tags{color:var(--muted); font-size:12px}
+    .code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; color:#c7d2fe; font-size:13px}
+    .btn{
+      padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:#202638; color:#e5e7eb; cursor:pointer; transition:.15s transform, .15s background;
+    }
+    .btn:hover{background:var(--hover)}
+    .btn:active{transform:scale(.98)}
+    .empty{padding:24px; text-align:center; color:var(--muted)}
+    .foot{display:flex; gap:12px; align-items:center; justify-content:space-between; color:var(--muted); font-size:12px; margin-top:12px}
+    .toast{
+      position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
+      background:#0b1220; color:#d1fae5; padding:10px 14px; border-radius:999px; border:1px solid #1f2937; opacity:0; pointer-events:none;
+      transition: .2s ease; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+    @media (max-width:720px){
+      .hide-sm{display:none}
+      .table tbody td, .table thead th{padding:10px}
+      .emoji{font-size:26px; width:36px; height:36px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>📚 Repositório de Emojis</h1>
+      <div class="search" role="search">
+        <input id="q" type="search" placeholder="Buscar por nome, tag ou emoji…" aria-label="Buscar emojis" autofocus>
+        <span class="pill" id="counter">0 itens</span>
+      </div>
+    </header>
+
+    <div style="overflow:auto; border-radius:14px">
+      <table class="table" aria-describedby="counter">
+        <thead>
+          <tr>
+            <th style="width:110px">Emoji / Imagem</th>
+            <th>Nome &amp; Tags</th>
+            <th class="hide-sm" style="width:180px">Código</th>
+            <th style="width:120px">Copiar</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <!-- Preenchido via JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="foot">
+      <span>💡 Dica: clique em “Copiar” para copiar o emoji.</span>
+      <span>Feito com ♥ — MIT</span>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true">Copiado!</div>
+
+  <script>
+    // === Dados dos Emojis ============================================
+    // Para adicionar: {emoji, name, tags, code} no array.
+    // "code" aqui é o codepoint Unicode em U+XXXX (apenas exibição).
+    const EMOJIS = [
+      { emoji: "😀", name: "Rosto sorridente", tags: ["smile","feliz","rosto"], code:"U+1F600" },
+      { emoji: "😁", name: "Sorriso largo", tags: ["grin","alegre"], code:"U+1F601" },
+      { emoji: "😂", name: "Rindo com lágrimas", tags: ["lol","risada","chorando"], code:"U+1F602" },
+      { emoji: "😊", name: "Sorriso tímido", tags: ["fofo","gentil"], code:"U+1F60A" },
+      { emoji: "😍", name: "Apaixonado", tags: ["coração","love","paixão"], code:"U+1F60D" },
+      { emoji: "😎", name: "Descolado", tags: ["óculos","cool"], code:"U+1F60E" },
+      { emoji: "🤔", name: "Pensativo", tags: ["pensar","hmm"], code:"U+1F914" },
+      { emoji: "😭", name: "Chorando muito", tags: ["triste","choro"], code:"U+1F62D" },
+      { emoji: "🤯", name: "Mente explodindo", tags: ["wow","surpreso"], code:"U+1F92F" },
+      { emoji: "🥳", name: "Festa", tags: ["parabéns","celebração","party"], code:"U+1F973" },
+      { emoji: "👍", name: "Joinha", tags: ["ok","aprovar","like"], code:"U+1F44D" },
+      { emoji: "👎", name: "Deslike", tags: ["não","reprovar"], code:"U+1F44E" },
+      { emoji: "🔥", name: "Fogo", tags: ["quente","trend"], code:"U+1F525" },
+      { emoji: "✨", name: "Brilhos", tags: ["estrelas","sparkles"], code:"U+2728" },
+      { emoji: "💯", name: "Cem", tags: ["100","perfeito","nota"], code:"U+1F4AF" },
+      { emoji: "✅", name: "Confirmado", tags: ["ok","check"], code:"U+2705" },
+      { emoji: "❌", name: "Errado", tags: ["x","erro"], code:"U+274C" },
+      { emoji: "⏳", name: "Ampulheta", tags: ["tempo","carregando"], code:"U+23F3" },
+      { emoji: "❤️", name: "Coração vermelho", tags: ["amor","love","coração"], code:"U+2764" },
+      { emoji: "🧠", name: "Cérebro", tags: ["ideia","pensamento","mente"], code:"U+1F9E0" },
+      { emoji: "📌", name: "Alfinete", tags: ["fixar","pin"], code:"U+1F4CC" },
+      { emoji: "📎", name: "Clipe", tags: ["anexo","clip"], code:"U+1F4CE" },
+      { emoji: "📣", name: "Megafone", tags: ["anúncio","promo"], code:"U+1F4E3" },
+      { emoji: "🔗", name: "Link", tags: ["cadeia","url"], code:"U+1F517" },
+      { emoji: "🖼️", name: "Imagem", tags: ["foto","figura"], code:"U+1F5BC" },
+      { emoji: "🗂️", name: "Arquivos", tags: ["organizar","pastas"], code:"U+1F5C2" },
+      { emoji: "📝", name: "Anotações", tags: ["nota","escrever"], code:"U+1F4DD" },
+      { emoji: "🧩", name: "Quebra-cabeça", tags: ["puzzle","peça"], code:"U+1F9E9" },
+      { emoji: "⚙️", name: "Engrenagem", tags: ["setup","config"], code:"U+2699" },
+      { emoji: "🚀", name: "Foguete", tags: ["lançar","startup"], code:"U+1F680" }
+    ];
+
+    // === Utilidades ===================================================
+    const $ = sel => document.querySelector(sel);
+    const rowsEl = $("#rows");
+    const counterEl = $("#counter");
+    const toastEl = $("#toast");
+    let filtered = EMOJIS.slice();
+
+    function render(list){
+      rowsEl.innerHTML = "";
+      if(!list.length){
+        rowsEl.innerHTML = `<tr><td colspan="4" class="empty">Nenhum resultado encontrado.</td></tr>`;
+      } else {
+        const frag = document.createDocumentFragment();
+        list.forEach((item, i) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>
+              <span class="emoji" aria-label="${escapeHTML(item.name)}" title="${escapeHTML(item.name)}">${item.emoji}</span>
+            </td>
+            <td>
+              <div class="name">${escapeHTML(item.name)}</div>
+              <div class="tags">#${item.tags.map(t=>escapeHTML(t)).join(" #")}</div>
+            </td>
+            <td class="hide-sm">
+              <span class="code">${escapeHTML(item.code)}</span>
+            </td>
+            <td>
+              <button class="btn copy" data-emoji="${encodeForAttr(item.emoji)}" aria-label="Copiar ${escapeHTML(item.name)}">Copiar</button>
+            </td>
+          `;
+          frag.appendChild(tr);
+        });
+        rowsEl.appendChild(frag);
+      }
+      counterEl.textContent = `${list.length} ${list.length===1?'item':'itens'}`;
+    }
+
+    function escapeHTML(s){
+      return String(s).replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
+    }
+    function encodeForAttr(s){
+      // Garante que o emoji vá seguro no atributo data-emoji
+      return encodeURIComponent(s);
+    }
+    function showToast(msg="Copiado!"){
+      toastEl.textContent = msg;
+      toastEl.classList.add("show");
+      clearTimeout(showToast.tid);
+      showToast.tid = setTimeout(()=>toastEl.classList.remove("show"), 1200);
+    }
+
+    async function copyText(text){
+      try{
+        if(navigator.clipboard && window.isSecureContext){
+          await navigator.clipboard.writeText(text);
+        }else{
+          // Fallback
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+        }
+        showToast("Copiado!");
+      }catch(e){
+        console.error(e);
+        showToast("Falhou 😕");
+      }
+    }
+
+    // Busca
+    $("#q").addEventListener("input", (e)=>{
+      const q = e.target.value.trim().toLowerCase();
+      if(!q){ filtered = EMOJIS.slice(); render(filtered); return; }
+      filtered = EMOJIS.filter(item=>{
+        const hay = [
+          item.emoji,
+          item.name,
+          item.tags.join(" "),
+          item.code
+        ].join(" ").toLowerCase();
+        return hay.includes(q);
+      });
+      render(filtered);
+    });
+
+    // Delegação do botão copiar
+    rowsEl.addEventListener("click", (e)=>{
+      const btn = e.target.closest(".copy");
+      if(!btn) return;
+      const emoji = decodeURIComponent(btn.dataset.emoji || "");
+      copyText(emoji);
+      // feedback visual rápido
+      btn.textContent = "Copiado!";
+      btn.disabled = true;
+      setTimeout(()=>{ btn.textContent = "Copiar"; btn.disabled = false; }, 800);
+    });
+
+    // Inicializa
+    render(filtered);
+  </script>
+</body>
+</html>
